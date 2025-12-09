@@ -1,0 +1,70 @@
+/*****************************************************************************\
+|* Data model definition
+\*****************************************************************************/
+model
+	{
+	// This is the clock. 100ns period, 50% duty cycle
+	clock clk 50 50;
+	
+	// These are external signals with their associated types
+	signal ADDRESS 	address[16];
+	signal DATA    	data[8];
+	signal RW		rw_n;
+	signal RESET	rst_n;
+	
+	// Declare the memory for the CPU
+	memory mem[65535];
+	
+	// Timescale for simulation is 10ns, or 1/10 of a clock period
+	resolution 10;
+	}
+	
+	
+/*****************************************************************************\
+|* Create an action that happens when conditions are met.
+|* 
+|* Define read operation timings and action. A latency of 90 means 90ns will  
+|* elapse before we change the data bus after RW/ADDRESS change. 
+|*
+|* Timings are specified from the falling edge of the clock
+\*****************************************************************************/
+action
+	{
+	setup 90;
+	hold 20;
+	if rw_n == 1;
+	do data = mem[address];
+	}
+	
+/*****************************************************************************\
+|* Create an action that happens when conditions are met.
+|* 
+|* Define a write operation timings and action. 
+\*****************************************************************************/
+action
+	{
+	setup 60;
+	hold 50;
+	if rw_n == 0;
+	do mem[address] = data;
+	}
+	
+/*****************************************************************************\
+|* Set up the initial conditions, and handle the ongoing sequence
+\*****************************************************************************/
+initial
+	{
+	mem[$FFFC] 	= 0x00;				// lo-byte of reset vector
+	mem[$FFFD] 	= 0x01;				// hi-byte of reset vector
+	mem[$0100]	= 0xE8;				// INX		
+	}
+
+/*****************************************************************************\
+|* Set up the simulation boundary conditions
+\*****************************************************************************/
+simulate
+	{
+	#0		start;
+	#200 	stop;
+	}
+	

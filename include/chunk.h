@@ -1,0 +1,59 @@
+//
+//  chunk.h
+//  6502e
+//
+//  Created by ThrudTheBarbarian on 09/12/2025.
+//
+
+
+#ifndef chunk_h
+#define chunk_h
+
+#include "value.h"
+
+typedef enum
+    {
+    OP_CONSTANT,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_NEGATE,
+    OP_RETURN,
+    } OpCode;
+
+// A chunk is a dynamic array, so implement count and capacity
+typedef struct
+    {
+    int         count;
+    int         capacity;
+    uint8_t*    code;
+    int *       lines;
+    ValueArray  constants;
+    } Chunk;
+
+
+/*****************************************************************************\
+|* Initialise a chunk
+\*****************************************************************************/
+void initChunk(Chunk* chunk);
+
+/*****************************************************************************\
+|* Append a byte to the end of a chunk
+\*****************************************************************************/
+void writeChunk(Chunk* chunk, uint8_t byte, int line);
+
+/*****************************************************************************\
+|* Append a value to the constants in the chunk.
+|*
+|* returns the index where the constant was appended so that we can locate
+|* that same constant later
+\*****************************************************************************/
+int addConstant(Chunk* chunk, Value value);
+
+/*****************************************************************************\
+|* Free a chunk and re-initialise. 
+\*****************************************************************************/
+void freeChunk(Chunk* chunk);
+
+#endif /* chunk_h */
