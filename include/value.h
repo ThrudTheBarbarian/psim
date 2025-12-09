@@ -11,10 +11,49 @@
 #include "common.h"
 
 /*****************************************************************************\
+|* Types that can be represented in a Value
+\*****************************************************************************/
+typedef enum
+    {
+    VAL_BOOL,
+    VAL_NIL,
+    VAL_NUMBER,
+    } ValueType;
+
+/*****************************************************************************\
 |* Basic type will be a 64-bit int. That ought to cover most of the needs of a
 |* simulation-type environment
 \*****************************************************************************/
-typedef int64_t Value;
+typedef struct
+    {
+    ValueType type;
+    union
+        {
+        bool boolean;
+        int64_t number;
+        } as;
+    } Value;
+
+/*****************************************************************************\
+|* How we promote a 'C' type to a psim type
+\*****************************************************************************/
+#define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
+#define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
+#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
+
+/*****************************************************************************\
+|* How we obtain a 'C' type from a psim type
+\*****************************************************************************/
+#define AS_BOOL(value)    ((value).as.boolean)
+#define AS_NUMBER(value)  ((value).as.number)
+
+/*****************************************************************************\
+|* How we check a psim type is of a given type
+\*****************************************************************************/
+#define IS_BOOL(value)    ((value).type == VAL_BOOL)
+#define IS_NIL(value)     ((value).type == VAL_NIL)
+#define IS_NUMBER(value)  ((value).type == VAL_NUMBER)
+
 #define VALUE_FORMAT_STRING "%lld"
 
 /*****************************************************************************\
@@ -27,6 +66,10 @@ typedef struct
     Value* values;
     } ValueArray;
 
+/*****************************************************************************\
+|* Determine if two values are equal
+\*****************************************************************************/
+bool valuesEqual(Value a, Value b);
 
 /*****************************************************************************\
 |* Initialise a value array
