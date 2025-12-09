@@ -11,6 +11,12 @@
 #include "common.h"
 
 /*****************************************************************************\
+|* Allocate space in the heap
+\*****************************************************************************/
+#define ALLOCATE(type, count)                                               \
+    (type*)reallocate(NULL, 0, sizeof(type) * (count))
+
+/*****************************************************************************\
 |* The number of bytes by which dynamic arrays are grown on demand
 \*****************************************************************************/
 #define GROW_CAPACITY(capacity)     ((capacity) < 8 ? 8 : (capacity) * 2)
@@ -23,7 +29,6 @@
                       sizeof(type) * (oldCount),                            \
                       sizeof(type) * (newCount))
 
-
 /*****************************************************************************\
 |* Release the memory storage of a dynamic array
 \*****************************************************************************/
@@ -34,5 +39,6 @@
 |* The actual code that reallocates memory
 \*****************************************************************************/
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+
 
 #endif /* memory_h */

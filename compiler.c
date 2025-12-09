@@ -10,6 +10,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "object.h"
 
 #ifdef DEBUG_PRINT_CODE
 #  include "debug.h"
@@ -58,6 +59,7 @@ static void unary(void);
 static void binary(void);
 static void number(void);
 static void literal(void);
+static void string(void);
 static void expression(void);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
@@ -86,7 +88,7 @@ ParseRule rules[] = {
   [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
@@ -244,6 +246,15 @@ static void endCompiler(void)
         if (!parser.hadError)
             disassembleChunk(currentChunk(), "code");
     #endif
+    }
+
+/*****************************************************************************\
+|* Helper function - emit strings
+\*****************************************************************************/
+static void string(void)
+    {
+    emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
+                                    parser.previous.length - 2)));
     }
 
 /*****************************************************************************\
