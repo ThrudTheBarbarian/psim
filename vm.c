@@ -34,6 +34,7 @@ static void resetStack(void)
 void initVM(void)
     {
     resetStack();
+    vm.objects = NULL;
     }
 
 /*****************************************************************************\
@@ -41,6 +42,7 @@ void initVM(void)
 \*****************************************************************************/
 void freeVM(void)
     {
+    freeObjects();
     }
 
 

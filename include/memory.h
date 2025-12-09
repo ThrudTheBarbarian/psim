@@ -9,6 +9,7 @@
 #define memory_h
 
 #include "common.h"
+#include "object.h"
 
 /*****************************************************************************\
 |* Allocate space in the heap
@@ -36,9 +37,18 @@
     reallocate(pointer, sizeof(type) * (oldCount), 0)
 
 /*****************************************************************************\
+|* Release memory allocated with ALLOCATE
+\*****************************************************************************/
+#define FREE(type, pointer) reallocate(pointer, sizeof(type), 0)
+
+/*****************************************************************************\
 |* The actual code that reallocates memory
 \*****************************************************************************/
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
 
+/*****************************************************************************\
+|* Free all the objects that the VM knows about
+\*****************************************************************************/
+void freeObjects(void);
 
 #endif /* memory_h */

@@ -24,7 +24,8 @@ typedef enum
 \*****************************************************************************/
 struct Obj
     {
-    ObjType type;
+    ObjType type;           // Type of the object
+    struct Obj* next        // Pointer to next object so we can garbage collect
     };
 
 /*****************************************************************************\

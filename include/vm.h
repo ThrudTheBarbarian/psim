@@ -21,8 +21,11 @@ typedef struct
     Chunk* chunk;               // The chunk we're working on
     uint8_t* ip;                // Thw instruction pointer to the current insn
     Value stack[STACK_MAX];     // Intermediate storage
-    Value* stackTop;
+    Value* stackTop;            // Pointer to next free value slot
+    Obj *objects;               // Intrinsic list of objects in VM 
     } VM;
+
+extern VM vm;
 
 typedef enum
     {
