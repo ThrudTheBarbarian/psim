@@ -96,14 +96,8 @@ bool valuesEqual(Value a, Value b)
             return AS_NUMBER(a) == AS_NUMBER(b);
 
         case VAL_OBJ:
-            {
-            ObjString* aString  = AS_STRING(a);
-            ObjString* bString  = AS_STRING(b);
-            bool matchLength    = (aString->length == bString->length);
-            return matchLength && (memcmp(aString->chars,
-                                          bString->chars,
-                                          aString->length) == 0);
-            }
+            // works because of interned strings
+            return AS_OBJ(a) == AS_OBJ(b);
             
         default:
             return false; // Unreachable.

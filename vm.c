@@ -35,6 +35,7 @@ void initVM(void)
     {
     resetStack();
     vm.objects = NULL;
+    initTable(&(vm.strings));
     }
 
 /*****************************************************************************\
@@ -43,6 +44,7 @@ void initVM(void)
 void freeVM(void)
     {
     freeObjects();
+    freeTable(&(vm.strings));
     }
 
 
@@ -156,7 +158,11 @@ static InterpretResult run(void)
             case OP_FALSE:
                 push(BOOL_VAL(false));
                 break;
-    
+  
+            case OP_POP:
+                pop();
+                break;
+
             case OP_EQUAL:
                 {
                 Value b = pop();
@@ -215,10 +221,13 @@ static InterpretResult run(void)
                     }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
-            
-            case OP_RETURN:
+
+            case OP_PRINT:
                 printValue(pop());
                 printf("\n");
+                break;
+                
+            case OP_RETURN:
                 return INTERPRET_OK;
 
             }

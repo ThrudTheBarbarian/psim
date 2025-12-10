@@ -25,7 +25,7 @@ typedef enum
 struct Obj
     {
     ObjType type;           // Type of the object
-    struct Obj* next        // Pointer to next object so we can garbage collect
+    struct Obj* next;       // Pointer to next object so we can garbage collect
     };
 
 /*****************************************************************************\
@@ -42,9 +42,10 @@ void printObject(Value value);
 \*****************************************************************************/
 struct ObjString
     {
-    Obj obj;
-    int length;
-    char* chars;
+    Obj obj;                // Parent properties
+    int length;             // Length of the string
+    char* chars;            // Actual string data
+    uint32_t hash;          // Value used for hashtables
     };
 
 /*****************************************************************************\

@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "chunk.h"
+#include "table.h"
 
 #define STACK_MAX 1024
 
@@ -22,7 +23,8 @@ typedef struct
     uint8_t* ip;                // Thw instruction pointer to the current insn
     Value stack[STACK_MAX];     // Intermediate storage
     Value* stackTop;            // Pointer to next free value slot
-    Obj *objects;               // Intrinsic list of objects in VM 
+    Obj *objects;               // Intrinsic list of objects in VM
+    Table strings;              // List of unique strings
     } VM;
 
 extern VM vm;

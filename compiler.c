@@ -61,6 +61,8 @@ static void number(void);
 static void literal(void);
 static void string(void);
 static void expression(void);
+static void statement(void);
+static void declaration(void);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
@@ -430,6 +432,25 @@ static void binary(void)
 
 
 /*****************************************************************************\
+|* Helper function - check if a token is of a given type
+\*****************************************************************************/
+static bool check(TokenType type)
+    {
+    return parser.current.type == type;
+    }
+
+/*****************************************************************************\
+|* Helper function - consume the token if we match a given type
+\*****************************************************************************/
+static bool match(TokenType type)
+    {
+    if (!check(type))
+        return false;
+    advance();
+    return true;
+    }
+
+/*****************************************************************************\
 |* Called to compile the code, public interface
 \*****************************************************************************/
 bool compile(const char* source, Chunk* chunk)
@@ -441,9 +462,107 @@ bool compile(const char* source, Chunk* chunk)
     parser.panicMode    = false;
     
     advance();
-    expression();
-    consume(TOKEN_EOF, "Expect end of expression.");
+    while (!match(TOKEN_EOF))
+        {
+        declaration();
+        }
 
     endCompiler();
     return !parser.hadError;
+    }
+
+
+/*****************************************************************************\
+|* Helper function - we're panicking because of errors. Skip stuff until we
+|* see something we recognise
+\*****************************************************************************/
+static void synchronize(void)
+    {
+    parser.panicMode = false;
+
+    while (parser.current.type != TOKEN_EOF)
+        {
+        if (parser.previous.type == TOKEN_SEMICOLON)
+            return;
+    
+        switch (parser.current.type)
+            {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+
+            default:
+                ; // Do nothing.
+            }
+
+        advance();
+        }
+    }
+
+/*****************************************************************************\
+|* Manage declarations. We keep compiling declarations until we get to EOF
+|*
+|*  declaration    → classDecl
+|*                 | funDecl
+|*                 | varDecl
+|*                 | statement ;
+|*
+\*****************************************************************************/
+static void declaration(void)
+    {
+    statement();
+    
+    // Stop panicking about errors if we are currently doing so
+    if (parser.panicMode)
+        synchronize();
+    }
+
+
+/*****************************************************************************\
+|* Helper function - evaluates an expression and prints the result
+\*****************************************************************************/
+static void printStatement(void)
+    {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+    emitByte(OP_PRINT);
+    }
+
+/*****************************************************************************\
+|* Helper function - evaluates an expression
+\*****************************************************************************/
+static void expressionStatement(void)
+    {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    emitByte(OP_POP);
+    }
+
+
+/*****************************************************************************\
+|* Statements are declarations that are allowed inside a control-flow body.
+|* They must leave the stack in the state they found it, unlike expressions
+|* which must leave one value on the stack
+|*
+|*  statement      → exprStmt
+|*                 | forStmt
+|*                 | ifStmt
+|*                 | printStmt
+|*                 | returnStmt
+|*                 | whileStmt
+|*                 | block ;
+|*
+\*****************************************************************************/
+static void statement(void)
+    {
+    if (match(TOKEN_PRINT))
+        printStatement();
+    else
+        expressionStatement();
     }

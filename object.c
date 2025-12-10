@@ -12,6 +12,7 @@
 #include "object.h"
 #include "value.h"
 #include "vm.h"
+#include "table.h"
 
 /*****************************************************************************\
 |* Allocate space on the heap for an object
@@ -29,38 +30,6 @@ static Obj* allocateObject(size_t size, ObjType type)
     return object;
     }
 
-
-/*****************************************************************************\
-|* Helper function: Do the real allocation for a string
-\*****************************************************************************/
-static ObjString* allocateString(char* chars, int length)
-    {
-    ObjString* string   = ALLOCATE_OBJ(ObjString, OBJ_STRING);
-    string->length      = length;
-    string->chars       = chars;
-    return string;
-    }
-
-/*****************************************************************************\
-|* Take a copy of a C string and put it into an ObjString*
-\*****************************************************************************/
-ObjString* copyString(const char* chars, int length)
-    {
-    char* heapChars = ALLOCATE(char, length + 1);
-    memcpy(heapChars, chars, length);
-    heapChars[length] = '\0';
-    return allocateString(heapChars, length);
-    }
-    
-/*****************************************************************************\
-|* Take a copy of a C string and put it into an ObjString. Takes ownership of
-|* the passed-in pointer
-\*****************************************************************************/
-ObjString* takeString(char* chars, int length)
-    {
-    return allocateString(chars, length);
-    }
-
 /*****************************************************************************\
 |* Print an object's value
 \*****************************************************************************/
@@ -73,3 +42,74 @@ void printObject(Value value)
             break;
         }
     }
+
+#pragma mark Strings
+
+/*****************************************************************************\
+|* Helper function: Do the real allocation for a string
+\*****************************************************************************/
+static ObjString* allocateString(char* chars, int length, uint32_t hash)
+    {
+    ObjString* string   = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+    string->length      = length;
+    string->chars       = chars;
+    string->hash        = hash;
+    
+    // Add it to the set of unique strings
+    tableSet(&vm.strings, string, NIL_VAL);
+    return string;
+    }
+
+/*****************************************************************************\
+|* Helper function: Compute a hash for a string using FNV-1a
+\*****************************************************************************/
+static uint32_t hashString(const char* key, int length)
+    {
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < length; i++)
+        {
+        hash ^= (uint8_t)key[i];
+        hash *= 16777619;
+        }
+    return hash;
+    }
+
+/*****************************************************************************\
+|* Take a copy of a C string and put it into an ObjString*
+\*****************************************************************************/
+ObjString* copyString(const char* chars, int length)
+    {
+    uint32_t hash       = hashString(chars, length);
+    
+    // Check to see if this string has been interned into the unique-strings
+    // table in the VM
+    ObjString* interned = tableFindString(&(vm.strings), chars, length,
+                                        hash);
+    if (interned != NULL)
+        return interned;
+
+    char* heapChars = ALLOCATE(char, length + 1);
+    memcpy(heapChars, chars, length);
+    heapChars[length]   = '\0';
+
+    return allocateString(heapChars, length, hash);
+    }
+    
+/*****************************************************************************\
+|* Take a copy of a C string and put it into an ObjString. Takes ownership of
+|* the passed-in pointer
+\*****************************************************************************/
+ObjString* takeString(char* chars, int length)
+    {
+    uint32_t hash       = hashString(chars, length);
+    ObjString* interned = tableFindString(&(vm.strings), chars, length,
+                                        hash);
+    if (interned != NULL)
+        {
+        FREE_ARRAY(char, chars, length + 1);
+        return interned;
+        }
+
+    return allocateString(chars, length, hash);
+    }
+
