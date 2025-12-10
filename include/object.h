@@ -17,9 +17,11 @@
 \*****************************************************************************/
 typedef enum
     {
+    OBJ_CLOSURE,
     OBJ_NATIVE,
     OBJ_FUNCTION,
     OBJ_STRING,
+    OBJ_UPVALUE
     } ObjType;
 
 /*****************************************************************************\
@@ -70,6 +72,7 @@ static inline bool isObjType(Value value, ObjType type)
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 #define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
 #define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
+#define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
 
 /*****************************************************************************\
 |* Get either an ObjString or C-style string from a value (make sure to use
@@ -79,6 +82,7 @@ static inline bool isObjType(Value value, ObjType type)
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
 #define AS_NATIVE(value)       (((ObjNative*)AS_OBJ(value))->function)
+#define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
 
 /*****************************************************************************\
 |* Take a copy of a C string and put it into an ObjString. Allocate on heap
@@ -98,6 +102,7 @@ typedef struct
     {
     Obj obj;                // Parent object data
     int arity;              // number of parameters the function expects
+    int upvalueCount;       // Number of captured-from-enclosure vars
     Chunk chunk;            // Bytecode for the function
     ObjString* name;        // Name of the function
     } ObjFunction;
@@ -115,7 +120,7 @@ typedef Value (*NativeFn)(int argCount, Value* args);
 
 typedef struct
     {
-    Obj obj;                // PArent object data
+    Obj obj;                // Parent object data
     NativeFn function;      // The actual C function
     } ObjNative;
 
@@ -123,5 +128,39 @@ typedef struct
 |* Create a new native function
 \*****************************************************************************/
 ObjNative* newNative(NativeFn function);
+
+
+
+#pragma mark - Up-values
+
+typedef struct ObjUpvalue
+    {
+    Obj obj;                    // Parent object data
+    Value* location;            // Pointer to closed-over value
+    struct ObjUpvalue* next;    // Pointer to next in list
+    Value closed;               // The value of a closed-over up-value
+    } ObjUpvalue;
+
+/*****************************************************************************\
+|* Create a new upValue
+\*****************************************************************************/
+ObjUpvalue* newUpvalue(Value* slot);
+
+
+
+#pragma mark - Closures
+
+typedef struct
+    {
+    Obj obj;                // Parent object data
+    ObjFunction* function;  // Closures are sort of functions with data
+    ObjUpvalue** upvalues;  // upvalues in this closure
+    int upvalueCount;       // Number of upvalues
+    } ObjClosure;
+
+/*****************************************************************************\
+|* Create a new closure
+\*****************************************************************************/
+ObjClosure* newClosure(ObjFunction* function);
 
 #endif /* object_h */

@@ -23,7 +23,7 @@
 \*****************************************************************************/
 typedef struct
     {
-    ObjFunction* function;          // The function in question
+    ObjClosure* closure;            // The function in question
     uint8_t* ip;                    // Where to return to after execution
     Value* slots;                   // Pointer to first variable slot
     } CallFrame;
@@ -41,6 +41,7 @@ typedef struct
     Value* stackTop;                // Pointer to next free value slot
     Obj *objects;                   // Intrinsic list of objects in VM
     Table strings;                  // List of unique strings
+    ObjUpvalue* openUpvalues;       // List of up-values
     Table globals;                  // List of global variables [21.2]
     } VM;
 
