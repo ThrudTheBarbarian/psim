@@ -30,8 +30,18 @@ typedef struct
     int depth;                  // scope-depth of the block we're in
     } Local;
 
-typedef struct
+typedef enum
     {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT
+    } FunctionType;
+
+typedef struct Compiler
+    {
+    struct Compiler* enclosing; // Parent compiler, or NULL
+    ObjFunction* function;      // Current function being compiled
+    FunctionType type;          // Type of current function
+    
     Local locals[UINT8_COUNT];  // List of local variable indices
     int localCount;             // Number of local variables at this scope
     int scopeDepth;             // Scope identifier
@@ -67,6 +77,7 @@ typedef struct
     } ParseRule;
 
 // Function declarations:
+static void call(bool canAssign);
 static void grouping(bool canAssign);
 static void unary(bool canAssign);
 static void binary(bool canAssign);
@@ -87,11 +98,14 @@ static void and_(bool canAssign);
 static int emitJump(uint8_t instruction);
 static void patchJump(int offset);
 static void or_(bool canAssign);
-
+static void beginScope(void);
+static void endScope(void);
+static void block(void);
+static bool check(TokenType type);
 
 // Define Pratt parser table using the above:
 ParseRule rules[] = {
-  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
+  [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_CALL},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
@@ -136,7 +150,6 @@ ParseRule rules[] = {
 
 
 Parser parser;                  // The current parser state
-Chunk* compilingChunk;          // The chunk we're compiling to right now
 Compiler* current = NULL;       // Local variable management
 
 /*****************************************************************************\
@@ -208,7 +221,7 @@ static void consume(TokenType type, const char* message)
 \*****************************************************************************/
 static Chunk* currentChunk(void)
     {
-    return compilingChunk;
+    return &current->function->chunk;
     }
 
 /*****************************************************************************\
@@ -233,6 +246,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2)
 \*****************************************************************************/
 static void emitReturn(void)
     {
+    emitByte(OP_NIL);
     emitByte(OP_RETURN);
     }
 
@@ -262,24 +276,49 @@ static void emitConstant(Value value)
 /*****************************************************************************\
 |* Helper function - initialise local variable state
 \*****************************************************************************/
-static void initCompiler(Compiler* compiler)
+static void initCompiler(Compiler* compiler, FunctionType type)
     {
-    compiler->localCount = 0;
-    compiler->scopeDepth = 0;
-    current = compiler;
+    compiler->function      = NULL;
+    compiler->type          = type;
+    compiler->enclosing     = current;
+    
+    compiler->localCount    = 0;
+    compiler->scopeDepth    = 0;
+    
+    // Bootstrap the compiler's current function
+    compiler->function      = newFunction();
+    
+    current                 = compiler;
+ 
+    if (type != TYPE_SCRIPT)
+        current->function->name = copyString(parser.previous.start,
+                                             parser.previous.length);
+
+    // Claim first slot in locals for compiler's own use
+    Local* local            = &current->locals[current->localCount++];
+    local->depth            = 0;
+    local->name.start       = "";   // Make sure a user can't overwrite
+    local->name.length      = 0;
     }
 
 /*****************************************************************************\
 |* Helper function - tidy up when compilation is done
 \*****************************************************************************/
-static void endCompiler(void)
+static ObjFunction * endCompiler(void)
     {
     emitReturn();
     
+    ObjFunction* function = current->function;
+    
     #ifdef DEBUG_PRINT_CODE
         if (!parser.hadError)
-            disassembleChunk(currentChunk(), "code");
+            disassembleChunk(currentChunk(),
+                             function->name != NULL ? function->name->chars
+                                                    : "<script>");
     #endif
+    
+    current = current->enclosing;
+    return function;
     }
 
 /*****************************************************************************\
@@ -383,6 +422,38 @@ static void namedVariable(Token name, bool canAssign)
         emitBytes(getOp, arg);
     }
 
+/*****************************************************************************\
+|* Helper function - fetch and return the number of arguments to a function
+\*****************************************************************************/
+static uint8_t argumentList(void)
+    {
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_PAREN))
+        {
+        do
+            {
+            expression();
+            if (argCount == 255)
+                error("Can't have more than 255 arguments.");
+
+            argCount++;
+            }
+        while (match(TOKEN_COMMA));
+        }
+  
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    return argCount;
+    }
+
+/*****************************************************************************\
+|* Helper function - allow function calls
+\*****************************************************************************/
+static void call(bool canAssign)
+    {
+    uint8_t argCount = argumentList();
+    emitBytes(OP_CALL, argCount);
+    }
+    
 /*****************************************************************************\
 |* Helper function - allow logical and, basically an if statement
 \*****************************************************************************/
@@ -584,15 +655,14 @@ static bool match(TokenType type)
 /*****************************************************************************\
 |* Called to compile the code, public interface
 \*****************************************************************************/
-bool compile(const char* source, Chunk* chunk)
+ObjFunction * compile(const char* source)
     {
     initScanner(source);
  
     // Manage scope-depthed local variables
     Compiler compiler;
-    initCompiler(&compiler);
+    initCompiler(&compiler, TYPE_SCRIPT);
 
-    compilingChunk      = chunk;
     parser.hadError     = false;
     parser.panicMode    = false;
     
@@ -602,8 +672,8 @@ bool compile(const char* source, Chunk* chunk)
         declaration();
         }
 
-    endCompiler();
-    return !parser.hadError;
+    ObjFunction* function = endCompiler();
+    return parser.hadError ? NULL : function;
     }
 
 
@@ -712,6 +782,10 @@ static uint8_t parseVariable(const char* errorMessage)
 \*****************************************************************************/
 static void markInitialized(void)
     {
+    // Functions can be in top-level scope
+    if (current->scopeDepth == 0)
+        return;
+        
     current->locals[current->localCount - 1].depth = current->scopeDepth;
     }
 
@@ -747,6 +821,52 @@ static void varDeclaration(void)
     }
 
 /*****************************************************************************\
+|* Helper function - compile a function
+\*****************************************************************************/
+static void function(FunctionType type)
+    {
+    Compiler compiler;
+    initCompiler(&compiler, type);
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    
+    if (!check(TOKEN_RIGHT_PAREN))
+        {
+        do
+            {
+            current->function->arity++;
+            if (current->function->arity > 255)
+                errorAtCurrent("Can't have more than 255 parameters.");
+                
+            uint8_t constant = parseVariable("Expect parameter name.");
+            defineVariable(constant);
+            }
+        while (match(TOKEN_COMMA));
+        }
+
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    ObjFunction* function = endCompiler();
+    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+    
+    // no need for an endScope() call because we ended the compiler
+    }
+
+/*****************************************************************************\
+|* Helper function - declare a function
+\*****************************************************************************/
+static void funDeclaration(void)
+    {
+    uint8_t global = parseVariable("Expect function name.");
+    markInitialized();
+    function(TYPE_FUNCTION);
+    defineVariable(global);
+    }
+    
+/*****************************************************************************\
 |* Manage declarations. We keep compiling declarations until we get to EOF
 |*
 |*  declaration    → classDecl
@@ -757,7 +877,9 @@ static void varDeclaration(void)
 \*****************************************************************************/
 static void declaration(void)
     {
-    if (match(TOKEN_VAR))
+    if (match(TOKEN_FUN))
+        funDeclaration();
+    else if (match(TOKEN_VAR))
         varDeclaration();
     else
         statement();
@@ -910,6 +1032,24 @@ static void whileStatement(void)
     }
 
 /*****************************************************************************\
+|* Helper function - allow returns from functions
+\*****************************************************************************/
+static void returnStatement(void)
+    {
+    if (current->type == TYPE_SCRIPT)
+        error("Can't return from top-level code.");
+  
+    if (match(TOKEN_SEMICOLON))
+        emitReturn();
+    else
+        {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
+        emitByte(OP_RETURN);
+        }
+    }
+
+/*****************************************************************************\
 |* Helper function - handle for statements
 \*****************************************************************************/
 static void forStatement(void)
@@ -985,6 +1125,8 @@ static void statement(void)
         printStatement();
     else if (match(TOKEN_IF))
         ifStatement();
+    else if (match(TOKEN_RETURN))
+        returnStatement();
     else if (match(TOKEN_WHILE))
         whileStatement();
     else if (match(TOKEN_FOR))

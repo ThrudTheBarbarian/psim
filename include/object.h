@@ -10,12 +10,14 @@
 
 #include "common.h"
 #include "value.h"
+#include "chunk.h"
 
 /*****************************************************************************\
 |* Enumerate the types of object (basically structured data) we understand
 \*****************************************************************************/
 typedef enum
     {
+    OBJ_FUNCTION,
     OBJ_STRING,
     } ObjType;
 
@@ -65,6 +67,7 @@ static inline bool isObjType(Value value, ObjType type)
 |* Determine if a value is a string
 \*****************************************************************************/
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
+#define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
 
 /*****************************************************************************\
 |* Get either an ObjString or C-style string from a value (make sure to use
@@ -72,6 +75,7 @@ static inline bool isObjType(Value value, ObjType type)
 \*****************************************************************************/
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
+#define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
 
 /*****************************************************************************\
 |* Take a copy of a C string and put it into an ObjString. Allocate on heap
@@ -83,5 +87,22 @@ ObjString* copyString(const char* chars, int length);
 |* the passed-in pointer
 \*****************************************************************************/
 ObjString* takeString(char* chars, int length);
+
+
+#pragma mark Functions
+
+typedef struct
+    {
+    Obj obj;                // Parent object data
+    int arity;              // number of parameters the function expects
+    Chunk chunk;            // Bytecode for the function
+    ObjString* name;        // Name of the function
+    } ObjFunction;
+
+
+/*****************************************************************************\
+|* Create a new function
+\*****************************************************************************/
+ObjFunction* newFunction(void);
 
 #endif /* object_h */
