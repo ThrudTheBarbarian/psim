@@ -40,7 +40,7 @@ typedef enum
     } Precedence;
 
 // Functions used for parsing various entities
-typedef void (*ParseFn)(void);
+typedef void (*ParseFn)(bool canAssign);
 
 // Define a type that provides:
 //  - a function to parse a prefix expression, starting with token of type
@@ -54,21 +54,21 @@ typedef struct
     } ParseRule;
 
 // Function declarations:
-static void grouping(void);
-static void unary(void);
-static void binary(void);
-static void number(void);
-static void literal(void);
-static void string(void);
+static void grouping(bool canAssign);
+static void unary(bool canAssign);
+static void binary(bool canAssign);
+static void number(bool canAssign);
+static void literal(bool canAssign);
+static void string(bool canAssign);
 static void expression(void);
 static void statement(void);
 static void declaration(void);
-static void variable(void);
-static void namedVariable(Token name);
+static void variable(bool canAssign);
+static void namedVariable(Token name, bool canAssign);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint8_t identifierConstant(Token* name);
-
+static bool match(TokenType type);
 
 
 // Define Pratt parser table using the above:
@@ -256,7 +256,7 @@ static void endCompiler(void)
 /*****************************************************************************\
 |* Helper function - emit strings
 \*****************************************************************************/
-static void string(void)
+static void string(bool canAssign)
     {
     emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
                                     parser.previous.length - 2)));
@@ -265,7 +265,7 @@ static void string(void)
 /*****************************************************************************\
 |* Helper function - emit numbers
 \*****************************************************************************/
-static void number(void)
+static void number(bool canAssign)
     {
     int64_t val;
     sscanf(parser.previous.start, VALUE_FORMAT_STRING, &val);
@@ -275,7 +275,7 @@ static void number(void)
 /*****************************************************************************\
 |* Helper function - emit for 'true', 'false' and 'nil'
 \*****************************************************************************/
-static void literal(void)
+static void literal(bool canAssign)
     {
     switch (parser.previous.type)
         {
@@ -299,18 +299,26 @@ static void literal(void)
 /*****************************************************************************\
 |* Helper function - allow variable access
 \*****************************************************************************/
-static void variable(void)
+static void variable(bool canAssign)
     {
-    namedVariable(parser.previous);
+    namedVariable(parser.previous, canAssign);
     }
 
 /*****************************************************************************\
 |* Helper function - allow named variable access
 \*****************************************************************************/
-static void namedVariable(Token name)
+static void namedVariable(Token name, bool canAssign)
     {
     uint8_t arg = identifierConstant(&name);
-    emitBytes(OP_GET_GLOBAL, arg);
+    
+    // Handle assignment by looking ahead 1
+    if (canAssign && match(TOKEN_EQUAL))
+        {
+        expression();
+        emitBytes(OP_SET_GLOBAL, arg);
+        }
+    else
+        emitBytes(OP_GET_GLOBAL, arg);
     }
 
 /*****************************************************************************\
@@ -329,14 +337,18 @@ static void parsePrecedence(Precedence precedence)
         return;
         }
 
-    prefixRule();
+    bool canAssign = precedence <= PREC_ASSIGNMENT;
+    prefixRule(canAssign);
 
     while (precedence <= getRule(parser.current.type)->precedence)
         {
         advance();
         ParseFn infixRule = getRule(parser.previous.type)->infix;
-        infixRule();
+        infixRule(canAssign);
         }
+        
+    if (canAssign && match(TOKEN_EQUAL))
+        error("Invalid assignment target.");
     }
 
 
@@ -360,7 +372,7 @@ static void expression(void)
 /*****************************************************************************\
 |* Helper function - handle parentheses as a group
 \*****************************************************************************/
-static void grouping(void)
+static void grouping(bool canAssign)
     {
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
@@ -369,7 +381,7 @@ static void grouping(void)
 /*****************************************************************************\
 |* Helper function - handle unary minus
 \*****************************************************************************/
-static void unary(void)
+static void unary(bool canAssign)
     {
     TokenType operatorType = parser.previous.type;
 
@@ -405,7 +417,7 @@ static ParseRule* getRule(TokenType type)
 /*****************************************************************************\
 |* Helper function - handle infix arithmetic (eg: 2 + 3)
 \*****************************************************************************/
-static void binary(void)
+static void binary(bool canAssign)
     {
     TokenType operatorType  = parser.previous.type;
     ParseRule* rule         = getRule(operatorType);
