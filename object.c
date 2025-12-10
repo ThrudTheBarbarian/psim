@@ -47,10 +47,14 @@ void printObject(Value value)
         case OBJ_FUNCTION:
             printFunction(AS_FUNCTION(value));
             break;
+
+        case OBJ_NATIVE:
+            printf("<native fn>");
+            break;
         }
     }
 
-#pragma mark Strings
+#pragma mark - Strings
 
 /*****************************************************************************\
 |* Helper function: Do the real allocation for a string
@@ -121,7 +125,7 @@ ObjString* takeString(char* chars, int length)
     }
 
 
-#pragma mark Functions
+#pragma mark - Functions
 
 /*****************************************************************************\
 |* Create a new function
@@ -150,3 +154,16 @@ static void printFunction(ObjFunction* function)
     printf("<fn %s>", function->name->chars);
     }
 
+
+#pragma mark - Native Functions
+
+
+/*****************************************************************************\
+|* Create a new native function
+\*****************************************************************************/
+ObjNative* newNative(NativeFn function)
+    {
+    ObjNative* native   = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+    native->function    = function;
+    return native;
+    }

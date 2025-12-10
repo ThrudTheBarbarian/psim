@@ -17,6 +17,7 @@
 \*****************************************************************************/
 typedef enum
     {
+    OBJ_NATIVE,
     OBJ_FUNCTION,
     OBJ_STRING,
     } ObjType;
@@ -37,7 +38,7 @@ void printObject(Value value);
 
 
 
-#pragma mark Strings
+#pragma mark - Strings
 
 /*****************************************************************************\
 |* Use struct inheritance to also define a string object type
@@ -68,6 +69,7 @@ static inline bool isObjType(Value value, ObjType type)
 \*****************************************************************************/
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 #define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
+#define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
 
 /*****************************************************************************\
 |* Get either an ObjString or C-style string from a value (make sure to use
@@ -76,6 +78,7 @@ static inline bool isObjType(Value value, ObjType type)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
+#define AS_NATIVE(value)       (((ObjNative*)AS_OBJ(value))->function)
 
 /*****************************************************************************\
 |* Take a copy of a C string and put it into an ObjString. Allocate on heap
@@ -89,7 +92,7 @@ ObjString* copyString(const char* chars, int length);
 ObjString* takeString(char* chars, int length);
 
 
-#pragma mark Functions
+#pragma mark - Functions
 
 typedef struct
     {
@@ -104,5 +107,21 @@ typedef struct
 |* Create a new function
 \*****************************************************************************/
 ObjFunction* newFunction(void);
+
+
+#pragma mark - Native Functions
+
+typedef Value (*NativeFn)(int argCount, Value* args);
+
+typedef struct
+    {
+    Obj obj;                // PArent object data
+    NativeFn function;      // The actual C function
+    } ObjNative;
+
+/*****************************************************************************\
+|* Create a new native function
+\*****************************************************************************/
+ObjNative* newNative(NativeFn function);
 
 #endif /* object_h */
