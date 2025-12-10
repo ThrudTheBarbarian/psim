@@ -83,6 +83,10 @@ static void parsePrecedence(Precedence precedence);
 static uint8_t identifierConstant(Token* name);
 static bool match(TokenType type);
 static bool identifiersEqual(Token* a, Token* b);
+static void and_(bool canAssign);
+static int emitJump(uint8_t instruction);
+static void patchJump(int offset);
+static void or_(bool canAssign);
 
 
 // Define Pratt parser table using the above:
@@ -109,7 +113,7 @@ ParseRule rules[] = {
   [TOKEN_IDENTIFIER]    = {variable, NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE},
@@ -117,7 +121,7 @@ ParseRule rules[] = {
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
   [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE},
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
@@ -378,6 +382,35 @@ static void namedVariable(Token name, bool canAssign)
     else
         emitBytes(getOp, arg);
     }
+
+/*****************************************************************************\
+|* Helper function - allow logical and, basically an if statement
+\*****************************************************************************/
+static void and_(bool canAssign)
+    {
+    int endJump = emitJump(OP_JUMP_IF_FALSE);
+
+    emitByte(OP_POP);
+    parsePrecedence(PREC_AND);
+
+    patchJump(endJump);
+    }
+
+/*****************************************************************************\
+|* Helper function - allow logical or
+\*****************************************************************************/
+static void or_(bool canAssign)
+    {
+    int elseJump    = emitJump(OP_JUMP_IF_FALSE);
+    int endJump     = emitJump(OP_JUMP);
+
+    patchJump(elseJump);
+    emitByte(OP_POP);
+
+    parsePrecedence(PREC_OR);
+    patchJump(endJump);
+    }
+
 
 /*****************************************************************************\
 |* Helper function - parse expressions of a given precedence or higher. This
