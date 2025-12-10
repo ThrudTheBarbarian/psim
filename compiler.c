@@ -792,6 +792,55 @@ static void block(void)
     }
 
 /*****************************************************************************\
+|* Helper function - emit a jump with an unknown offset
+\*****************************************************************************/
+static int emitJump(uint8_t instruction)
+    {
+    emitByte(instruction);
+    emitByte(0xff);
+    emitByte(0xff);
+    return currentChunk()->count - 2;
+    }
+
+/*****************************************************************************\
+|* Helper function - update the offset of where to jump to, in the previously
+|* emitted jump
+\*****************************************************************************/
+static void patchJump(int offset)
+    {
+    // -2 to adjust for the bytecode for the jump offset itself.
+    int jump = currentChunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX)
+        error("Too much code to jump over.");
+
+    currentChunk()->code[offset]        = (jump >> 8) & 0xff;
+    currentChunk()->code[offset + 1]    = (jump     ) & 0xff;
+    }
+
+/*****************************************************************************\
+|* Helper function - handle if statements
+\*****************************************************************************/
+static void ifStatement(void)
+    {
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+    int thenJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);   // Tidy up the stack
+    statement();
+
+    int elseJump = emitJump(OP_JUMP);
+    patchJump(thenJump);
+    emitByte(OP_POP);   // =Tidy uo the stack
+
+    if (match(TOKEN_ELSE))
+        statement();
+    patchJump(elseJump);
+    }
+
+/*****************************************************************************\
 |* Statements are declarations that are allowed inside a control-flow body.
 |* They must leave the stack in the state they found it, unlike expressions
 |* which must leave one value on the stack
@@ -811,6 +860,8 @@ static void statement(void)
     {
     if (match(TOKEN_PRINT))
         printStatement();
+    else if (match(TOKEN_IF))
+        ifStatement();
     else if (match(TOKEN_LEFT_BRACE))
         {
         beginScope();
