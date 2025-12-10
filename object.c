@@ -25,11 +25,17 @@ static void printFunction(ObjFunction* function);
 
 static Obj* allocateObject(size_t size, ObjType type)
     {
-    Obj* object     = (Obj*)reallocate(NULL, 0, size);
-    object->type    = type;
+    Obj* object         = (Obj*)reallocate(NULL, 0, size);
+    object->type        = type;
+    object->isMarked    = false;
+
+    object->next        = vm.objects;
+    vm.objects          = object;
     
-    object->next    = vm.objects;
-    vm.objects      = object;
+    #ifdef DEBUG_LOG_GC
+        printf("%p allocate %zu for type %d\n", (void*)object, size, type);
+    #endif
+
     return object;
     }
 
@@ -40,6 +46,10 @@ void printObject(Value value)
     {
     switch (OBJ_TYPE(value))
         {
+        case OBJ_CLASS:
+            printf("%s", AS_CLASS(value)->name->chars);
+            break;
+
         case OBJ_STRING:
             printf("%s", AS_CSTRING(value));
             break;
@@ -59,6 +69,10 @@ void printObject(Value value)
         case OBJ_UPVALUE:
             printf("upvalue");
             break;
+
+        case OBJ_INSTANCE:
+            printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
+            break;
        }
     }
 
@@ -74,8 +88,15 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash)
     string->chars       = chars;
     string->hash        = hash;
     
+    // Protect against GC
+    push(OBJ_VAL(string));
+    
     // Add it to the set of unique strings
     tableSet(&vm.strings, string, NIL_VAL);
+    
+    // relinquish the protection
+    pop();
+    
     return string;
     }
 
@@ -212,3 +233,26 @@ ObjUpvalue* newUpvalue(Value* slot)
     return upvalue;
     }
 
+
+#pragma mark - Classes and instances
+
+/*****************************************************************************\
+|* Create a new class
+\*****************************************************************************/
+ObjClass* newClass(ObjString* name)
+    {
+    ObjClass* klass         = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name             = name;
+    return klass;
+    }
+
+/*****************************************************************************\
+|* Create a new instance
+\*****************************************************************************/
+ObjInstance* newInstance(ObjClass* klass)
+    {
+    ObjInstance* instance   = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->klass         = klass;
+    initTable(&instance->fields);
+    return instance;
+    }

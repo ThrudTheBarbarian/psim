@@ -51,4 +51,15 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize);
 \*****************************************************************************/
 void freeObjects(void);
 
+/*****************************************************************************\
+|* Perform garbage collection
+\*****************************************************************************/
+void collectGarbage(void);
+
+/*****************************************************************************\
+|* GC: Mark a value/object as a root
+\*****************************************************************************/
+void markValue(Value value);
+void markObject(Obj* object);
+
 #endif /* memory_h */

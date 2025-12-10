@@ -218,3 +218,30 @@ ObjString* tableFindString(Table* table,
         index = (index + 1) % table->capacity;
         }
     }
+
+
+/*****************************************************************************\
+|* GC: Mark objects within the table as valid
+\*****************************************************************************/
+void markTable(Table* table)
+    {
+    for (int i = 0; i < table->capacity; i++)
+        {
+        Entry* entry = &table->entries[i];
+        markObject((Obj*)entry->key);
+        markValue(entry->value);
+        }
+    }
+    
+/*****************************************************************************\
+|* GC: Remove anything not marked as part of the grey/black list
+\*****************************************************************************/
+void tableRemoveWhite(Table* table)
+    {
+    for (int i = 0; i < table->capacity; i++)
+        {
+        Entry* entry = &table->entries[i];
+        if (entry->key != NULL && !entry->key->obj.isMarked)
+            tableDelete(table, entry->key);
+        }
+    }

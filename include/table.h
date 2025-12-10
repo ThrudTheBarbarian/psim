@@ -66,4 +66,14 @@ ObjString* tableFindString(Table* table,
                            int length,
                            uint32_t hash);
 
+/*****************************************************************************\
+|* GC: Mark objects within the table as valid
+\*****************************************************************************/
+void markTable(Table* table);
+
+/*****************************************************************************\
+|* GC: Remove anything not marked as part of the grey/black list
+\*****************************************************************************/
+void tableRemoveWhite(Table* table);
+
 #endif /* table_h */

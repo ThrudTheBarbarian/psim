@@ -43,6 +43,10 @@ typedef struct
     Table strings;                  // List of unique strings
     ObjUpvalue* openUpvalues;       // List of up-values
     Table globals;                  // List of global variables [21.2]
+
+    int grayCount;                  // GC: Number of items to process
+    int grayCapacity;               // GC: Max items we can know of atm
+    Obj** grayStack;                // GC: list of marked objects
     } VM;
 
 extern VM vm;

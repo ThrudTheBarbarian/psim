@@ -11,6 +11,7 @@
 #include "common.h"
 #include "value.h"
 #include "chunk.h"
+#include "table.h"
 
 /*****************************************************************************\
 |* Enumerate the types of object (basically structured data) we understand
@@ -21,7 +22,9 @@ typedef enum
     OBJ_NATIVE,
     OBJ_FUNCTION,
     OBJ_STRING,
-    OBJ_UPVALUE
+    OBJ_UPVALUE,
+    OBJ_CLASS,
+    OBJ_INSTANCE,
     } ObjType;
 
 /*****************************************************************************\
@@ -30,6 +33,7 @@ typedef enum
 struct Obj
     {
     ObjType type;           // Type of the object
+    bool isMarked;          // Marked to prevent GC reaping it
     struct Obj* next;       // Pointer to next object so we can garbage collect
     };
 
@@ -73,6 +77,8 @@ static inline bool isObjType(Value value, ObjType type)
 #define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
 #define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
 #define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
+#define IS_CLASS(value)        isObjType(value, OBJ_CLASS)
+#define IS_INSTANCE(value)     isObjType(value, OBJ_INSTANCE)
 
 /*****************************************************************************\
 |* Get either an ObjString or C-style string from a value (make sure to use
@@ -83,6 +89,8 @@ static inline bool isObjType(Value value, ObjType type)
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
 #define AS_NATIVE(value)       (((ObjNative*)AS_OBJ(value))->function)
 #define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
+#define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
+#define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
 
 /*****************************************************************************\
 |* Take a copy of a C string and put it into an ObjString. Allocate on heap
@@ -162,5 +170,29 @@ typedef struct
 |* Create a new closure
 \*****************************************************************************/
 ObjClosure* newClosure(ObjFunction* function);
+
+
+
+
+#pragma mark - Classes and instances
+
+typedef struct
+    {
+    Obj obj;                // Parent object data
+    ObjString* name;        // Name of the class
+    } ObjClass;
+
+typedef struct
+    {
+    Obj obj;                // Parent object data
+    ObjClass* klass;        // The class object
+    Table fields;           // A list of fields
+    } ObjInstance;
+
+/*****************************************************************************\
+|* Create a new class or instance
+\*****************************************************************************/
+ObjClass* newClass(ObjString* name);
+ObjInstance* newInstance(ObjClass* klass);
 
 #endif /* object_h */
