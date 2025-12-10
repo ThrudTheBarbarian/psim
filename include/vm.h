@@ -41,6 +41,7 @@ typedef struct
     Value* stackTop;                // Pointer to next free value slot
     Obj *objects;                   // Intrinsic list of objects in VM
     Table strings;                  // List of unique strings
+    ObjString* initString;          // Name of initialisation method for class
     ObjUpvalue* openUpvalues;       // List of up-values
     Table globals;                  // List of global variables [21.2]
 

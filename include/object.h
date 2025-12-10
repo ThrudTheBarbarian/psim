@@ -25,6 +25,7 @@ typedef enum
     OBJ_UPVALUE,
     OBJ_CLASS,
     OBJ_INSTANCE,
+    OBJ_BOUND_METHOD,
     } ObjType;
 
 /*****************************************************************************\
@@ -79,6 +80,7 @@ static inline bool isObjType(Value value, ObjType type)
 #define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
 #define IS_CLASS(value)        isObjType(value, OBJ_CLASS)
 #define IS_INSTANCE(value)     isObjType(value, OBJ_INSTANCE)
+#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 
 /*****************************************************************************\
 |* Get either an ObjString or C-style string from a value (make sure to use
@@ -91,6 +93,7 @@ static inline bool isObjType(Value value, ObjType type)
 #define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
 #define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
 #define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
+#define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 
 /*****************************************************************************\
 |* Take a copy of a C string and put it into an ObjString. Allocate on heap
@@ -174,12 +177,13 @@ ObjClosure* newClosure(ObjFunction* function);
 
 
 
-#pragma mark - Classes and instances
+#pragma mark - Classes, instances and methods
 
 typedef struct
     {
     Obj obj;                // Parent object data
     ObjString* name;        // Name of the class
+    Table methods;          // List of methods
     } ObjClass;
 
 typedef struct
@@ -188,11 +192,21 @@ typedef struct
     ObjClass* klass;        // The class object
     Table fields;           // A list of fields
     } ObjInstance;
+    
+typedef struct
+    {
+    Obj obj;                // Parent data object
+    Value receiver;         // What the method is bound to
+    ObjClosure* method;     // The method itself
+    } ObjBoundMethod;
+
 
 /*****************************************************************************\
-|* Create a new class or instance
+|* Create a new class, instance or bound method
 \*****************************************************************************/
 ObjClass* newClass(ObjString* name);
 ObjInstance* newInstance(ObjClass* klass);
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
+
 
 #endif /* object_h */
