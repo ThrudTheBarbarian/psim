@@ -280,11 +280,8 @@ static InterpretResult run(void)
                 break;
 
             case OP_JUMP:
-                {
-                uint16_t offset = READ_SHORT();
-                vm.ip += offset;
+                vm.ip += READ_SHORT();
                 break;
-                }
                 
             case OP_JUMP_IF_FALSE:
                 {
@@ -293,7 +290,11 @@ static InterpretResult run(void)
                     vm.ip += offset;
                 break;
                 }
-                
+                    
+            case OP_LOOP:
+                vm.ip -= READ_SHORT();
+                break;
+              
             case OP_RETURN:
                 return INTERPRET_OK;
 
