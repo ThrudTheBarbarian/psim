@@ -25,6 +25,7 @@ typedef struct
     Value* stackTop;            // Pointer to next free value slot
     Obj *objects;               // Intrinsic list of objects in VM
     Table strings;              // List of unique strings
+    Table globals;              // List of global variables [21.2]
     } VM;
 
 extern VM vm;

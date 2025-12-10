@@ -63,8 +63,11 @@ static void string(void);
 static void expression(void);
 static void statement(void);
 static void declaration(void);
+static void variable(void);
+static void namedVariable(Token name);
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
+static uint8_t identifierConstant(Token* name);
 
 
 
@@ -89,7 +92,7 @@ ParseRule rules[] = {
   [TOKEN_GREATER_EQUAL] = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
   [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
-  [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_IDENTIFIER]    = {variable, NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
@@ -293,6 +296,22 @@ static void literal(void)
         }
     }
 
+/*****************************************************************************\
+|* Helper function - allow variable access
+\*****************************************************************************/
+static void variable(void)
+    {
+    namedVariable(parser.previous);
+    }
+
+/*****************************************************************************\
+|* Helper function - allow named variable access
+\*****************************************************************************/
+static void namedVariable(Token name)
+    {
+    uint8_t arg = identifierConstant(&name);
+    emitBytes(OP_GET_GLOBAL, arg);
+    }
 
 /*****************************************************************************\
 |* Helper function - parse expressions of a given precedence or higher. This
@@ -318,6 +337,15 @@ static void parsePrecedence(Precedence precedence)
         ParseFn infixRule = getRule(parser.previous.type)->infix;
         infixRule();
         }
+    }
+
+
+/*****************************************************************************\
+|* Helper function - insert the token's lexeme to constant table as string
+\*****************************************************************************/
+static uint8_t identifierConstant(Token* name)
+    {
+    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
     }
 
 /*****************************************************************************\
@@ -506,6 +534,40 @@ static void synchronize(void)
     }
 
 /*****************************************************************************\
+|* Helper function - parse a variable out. Requires next token to be identifier
+\*****************************************************************************/
+static uint8_t parseVariable(const char* errorMessage)
+    {
+    consume(TOKEN_IDENTIFIER, errorMessage);
+    return identifierConstant(&parser.previous);
+    }
+
+/*****************************************************************************\
+|* Helper function - define a global variable
+\*****************************************************************************/
+static void defineVariable(uint8_t global)
+    {
+    emitBytes(OP_DEFINE_GLOBAL, global);
+    }
+
+/*****************************************************************************\
+|* Helper function - declare a variable
+\*****************************************************************************/
+static void varDeclaration(void)
+    {
+    uint8_t global = parseVariable("Expect variable name.");
+
+    if (match(TOKEN_EQUAL))
+        expression();
+    else
+        emitByte(OP_NIL);
+  
+    consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
+
+    defineVariable(global);
+    }
+
+/*****************************************************************************\
 |* Manage declarations. We keep compiling declarations until we get to EOF
 |*
 |*  declaration    → classDecl
@@ -516,7 +578,10 @@ static void synchronize(void)
 \*****************************************************************************/
 static void declaration(void)
     {
-    statement();
+    if (match(TOKEN_VAR))
+        varDeclaration();
+    else
+        statement();
     
     // Stop panicking about errors if we are currently doing so
     if (parser.panicMode)
