@@ -179,6 +179,13 @@ static InterpretResult run(void)
                 break;
                 }
 
+            case OP_GET_LOCAL:
+                {
+                uint8_t slot = READ_BYTE();
+                push(vm.stack[slot]);
+                break;
+                }
+
             case OP_SET_GLOBAL:
                 {
                 ObjString* name = READ_STRING();
@@ -189,6 +196,13 @@ static InterpretResult run(void)
                     runtimeError("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                     }
+                break;
+                }
+
+            case OP_SET_LOCAL:
+                {
+                uint8_t slot = READ_BYTE();
+                vm.stack[slot] = peek(0);
                 break;
                 }
 
