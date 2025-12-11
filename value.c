@@ -66,7 +66,7 @@ void printValue(Value value)
             break;
     
         case VAL_NUMBER:
-            printf("%lld", AS_NUMBER(value));
+            printf(VALUE_FORMAT_STRING, AS_NUMBER(value));
             break;
 
         case VAL_OBJ:

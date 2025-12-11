@@ -28,31 +28,16 @@ typedef enum
 |* Basic type will be a 64-bit int. That ought to cover most of the needs of a
 |* simulation-type environment
 \*****************************************************************************/
-typedef struct
-    {
-    ValueType type;
-    union
-        {
-        bool boolean;
-        int64_t number;
-        Obj* obj;
-        } as;
-    } Value;
 
-/*****************************************************************************\
-|* How we promote a 'C' type to a psim type
-\*****************************************************************************/
-#define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
-#define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
-#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
-#define OBJ_VAL(object)   ((Value){VAL_OBJ, {.obj = (Obj*)object}})
+//#define INTEGER_ONLY
 
-/*****************************************************************************\
-|* How we obtain a 'C' type from a psim type
-\*****************************************************************************/
-#define AS_BOOL(value)    ((value).as.boolean)
-#define AS_NUMBER(value)  ((value).as.number)
-#define AS_OBJ(value)     ((value).as.obj)
+#ifdef INTEGER_ONLY
+#  define VALUE_TYPE    int64_t
+#  define VALUE_FORMAT_STRING "%lld"
+#else
+#  define VALUE_TYPE    double
+#  define VALUE_FORMAT_STRING "%lg"
+#endif
 
 /*****************************************************************************\
 |* How we check a psim type is of a given type
@@ -62,7 +47,32 @@ typedef struct
 #define IS_NUMBER(value)  ((value).type == VAL_NUMBER)
 #define IS_OBJ(value)     ((value).type == VAL_OBJ)
 
-#define VALUE_FORMAT_STRING "%lld"
+/*****************************************************************************\
+|* How we obtain a 'C' type from a psim type
+\*****************************************************************************/
+#define AS_BOOL(value)    ((value).as.boolean)
+#define AS_NUMBER(value)  ((value).as.number)
+#define AS_OBJ(value)     ((value).as.obj)
+
+/*****************************************************************************\
+|* How we promote a 'C' type to a psim type
+\*****************************************************************************/
+#define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
+#define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
+#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
+#define OBJ_VAL(object)   ((Value){VAL_OBJ, {.obj = (Obj*)object}})
+
+typedef struct
+    {
+    ValueType type;
+    union
+        {
+        bool boolean;
+        VALUE_TYPE number;
+        Obj* obj;
+        } as;
+    } Value;
+
 
 /*****************************************************************************\
 |* Also handle arrays of types

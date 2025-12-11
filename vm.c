@@ -251,6 +251,20 @@ static bool bindMethod(ObjClass* klass, ObjString* name)
     }
 
 /*****************************************************************************\
+|* Get the instance's class and call the named method if it's present
+\*****************************************************************************/
+static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount)
+    {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method))
+        {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+        }
+    return call(AS_CLOSURE(method), argCount);
+    }
+
+/*****************************************************************************\
 |* Allow the byte code in a value to be called
 \*****************************************************************************/
 static bool callValue(Value callee, int argCount)
@@ -284,8 +298,11 @@ static bool callValue(Value callee, int argCount)
                 if (tableGet(&klass->methods, vm.initString, &initializer))
                     return call(AS_CLOSURE(initializer), argCount);
                 else if (argCount != 0)
+                    {
                     runtimeError("Expected 0 arguments but got %d.", argCount);
-                return false;
+                    return false;
+                    }
+                return true;
                 }
 
             case OBJ_CLOSURE:
@@ -298,6 +315,32 @@ static bool callValue(Value callee, int argCount)
     
     runtimeError("Can only call functions and classes.");
     return false;
+    }
+
+
+/*****************************************************************************\
+|* invoke a method
+\*****************************************************************************/
+static bool invoke(ObjString* name, int argCount)
+    {
+    Value receiver = peek(argCount);
+
+    if (!IS_INSTANCE(receiver))
+        {
+        runtimeError("Only instances have methods.");
+        return false;
+        }
+
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value))
+        {
+        vm.stackTop[-argCount - 1] = value;
+        return callValue(value, argCount);
+        }
+
+    return invokeFromClass(instance->klass, name, argCount);
     }
 
 /*****************************************************************************\
@@ -324,8 +367,8 @@ static InterpretResult run(void)
                 runtimeError("Operands must be numbers.");                  \
                 return INTERPRET_RUNTIME_ERROR;                             \
                 }                                                           \
-            int64_t b = AS_NUMBER(pop());                                   \
-            int64_t a = AS_NUMBER(pop());                                   \
+            VALUE_TYPE b = AS_NUMBER(pop());                                   \
+            VALUE_TYPE a = AS_NUMBER(pop());                                   \
             push(valueType(a op b));                                        \
             }                                                               \
         while (false)
@@ -443,8 +486,8 @@ static InterpretResult run(void)
                     }
                 else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1)))
                     {
-                    int64_t b = AS_NUMBER(pop());
-                    int64_t a = AS_NUMBER(pop());
+                    VALUE_TYPE b = AS_NUMBER(pop());
+                    VALUE_TYPE a = AS_NUMBER(pop());
                     push(NUMBER_VAL(a + b));
                     }
                 else
@@ -512,6 +555,28 @@ static InterpretResult run(void)
                 break;
                 }
   
+            case OP_INVOKE:
+                {
+                ObjString* method   = READ_STRING();
+                int argCount        = READ_BYTE();
+                if (!invoke(method, argCount))
+                    return INTERPRET_RUNTIME_ERROR;
+     
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+                }
+
+            case OP_SUPER_INVOKE:
+                {
+                ObjString* method       = READ_STRING();
+                int argCount            = READ_BYTE();
+                ObjClass* superclass    = AS_CLASS(pop());
+                if (!invokeFromClass(superclass, method, argCount))
+                    return INTERPRET_RUNTIME_ERROR;
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+                }
+
             case OP_CLOSURE:
                 {
                 ObjFunction* function   = AS_FUNCTION(READ_CONSTANT());
@@ -598,6 +663,33 @@ static InterpretResult run(void)
             case OP_METHOD:
                 defineMethod(READ_STRING());
                 break;
+
+            case OP_INHERIT:
+                {
+                Value superclass = peek(1);
+                
+                if (!IS_CLASS(superclass))
+                    {
+                    runtimeError("Superclass must be a class.");
+                    return INTERPRET_RUNTIME_ERROR;
+                    }
+
+                ObjClass* subclass = AS_CLASS(peek(0));
+                tableAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
+                pop(); // Subclass.
+                break;
+                }
+
+            case OP_GET_SUPER:
+                {
+                ObjString* name = READ_STRING();
+                ObjClass* superclass = AS_CLASS(pop());
+
+                if (!bindMethod(superclass, name))
+                    return INTERPRET_RUNTIME_ERROR;
+            
+                break;
+                }
 
             case OP_RETURN:
                 {

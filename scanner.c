@@ -367,6 +367,9 @@ Token scanToken(void)
         
         case '*':
             return makeToken(TOKEN_STAR);
+        
+        case ':':
+            return makeToken(TOKEN_COLON);
  
  
         /*********************************************************************\

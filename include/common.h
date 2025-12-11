@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NAN_BOXING
 //#define DEBUG_TRACE_EXECUTION
 //#define DEBUG_PRINT_CODE
 //#define DEBUG_STRESS_GC

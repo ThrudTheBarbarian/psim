@@ -1,15 +1,8 @@
-class CoffeeMaker {
-  init(coffee) {
-    this.coffee = coffee;
-  }
-
-  brew() {
-    print "Enjoy your cup of " + this.coffee;
-
-    // No reusing the grounds!
-    this.coffee = nil;
-  }
-}
-
-var maker = CoffeeMaker("coffee and chicory");
-maker.brew();
+var sum = 0;
+var start = clock();
+for (var i=0; i< 1000000000; i=i+1)
+	{
+	sum = sum + 1;
+	}
+print clock() - start;
+print sum;
